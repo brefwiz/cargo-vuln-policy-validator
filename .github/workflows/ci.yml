@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  ci:
+    uses: brefwiz/shared-ci-workflows/.github/workflows/rust.yml@main
+    with:
+      run-coverage: true
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Generate lockfile
+        run: cargo generate-lockfile
+      - name: Check docs
+        run: >
+          RUSTDOCFLAGS="-D warnings"
+          cargo doc --no-deps

@@ -1,0 +1,23 @@
+[package]
+name = "cargo-vuln-policy-validator"
+version = "0.1.0"
+edition = "2024"
+authors = ["Gregoire Salingue"]
+description = "Validate cargo audit and cargo deny ignore lists against a reviewed exception policy"
+license = "MIT"
+repository = "https://github.com/brefwiz/cargo-vuln-policy-validator"
+readme = "README.md"
+keywords = ["cargo", "security", "audit", "policy", "rustsec"]
+categories = ["command-line-utilities", "development-tools::cargo-plugins"]
+rust-version = "1.85"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_yaml = "0.9"
+toml = "0.8"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
+env_logger = "0.10"
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "1"
+anyhow = "1"
