@@ -31,37 +31,49 @@ impl<R: ExceptionRepository, P: Reporter> ValidateUseCase<R, P> {
 #[cfg(test)]
 mod tests {
     use super::ValidateUseCase;
-    use crate::domain::models::{Exception, TomlIgnore, Violation};
+    use crate::domain::models::{ExceptionRecord, SourceSpan, TomlIgnoreRecord, Violation};
     use crate::ports::inbound::ExceptionRepository;
     use crate::ports::outbound::Reporter;
     use chrono::{Duration, Utc};
     use std::sync::{Arc, Mutex};
 
-    fn exception(id: &str) -> Exception {
-        Exception {
+    fn span(path: &str, line: usize, column: usize) -> SourceSpan {
+        SourceSpan::new(path, line, column)
+    }
+
+    fn exception(id: &str) -> ExceptionRecord {
+        ExceptionRecord {
             id: id.to_string(),
             owner: "team-security".to_string(),
-            review_by: Utc::now().date_naive() + Duration::days(30),
+            review_by: Some(Utc::now().date_naive() + Duration::days(30)),
             reason: "temporary exception".to_string(),
             risk: "known".to_string(),
             impact: "low".to_string(),
             tracking: "SEC-123".to_string(),
             resolution: "upgrade planned".to_string(),
+            id_span: span("exceptions.yaml", 3, 9),
+            owner_span: Some(span("exceptions.yaml", 4, 12)),
+            review_by_span: Some(span("exceptions.yaml", 5, 16)),
+            reason_span: Some(span("exceptions.yaml", 6, 13)),
+            risk_span: Some(span("exceptions.yaml", 7, 11)),
+            impact_span: Some(span("exceptions.yaml", 8, 13)),
+            tracking_span: Some(span("exceptions.yaml", 9, 15)),
+            resolution_span: Some(span("exceptions.yaml", 10, 17)),
         }
     }
 
     struct StubRepo {
-        exceptions: Vec<Exception>,
-        audit_ignores: Vec<TomlIgnore>,
-        deny_ignores: Vec<TomlIgnore>,
+        exceptions: Vec<ExceptionRecord>,
+        audit_ignores: Vec<TomlIgnoreRecord>,
+        deny_ignores: Vec<TomlIgnoreRecord>,
     }
 
     impl ExceptionRepository for StubRepo {
-        fn load_exceptions(&self, _path: &str) -> anyhow::Result<Vec<Exception>> {
+        fn load_exceptions(&self, _path: &str) -> anyhow::Result<Vec<ExceptionRecord>> {
             Ok(self.exceptions.clone())
         }
 
-        fn load_toml_ignores(&self, path: &str) -> anyhow::Result<Vec<TomlIgnore>> {
+        fn load_toml_ignores(&self, path: &str) -> anyhow::Result<Vec<TomlIgnoreRecord>> {
             match path {
                 "audit.toml" => Ok(self.audit_ignores.clone()),
                 "deny.toml" => Ok(self.deny_ignores.clone()),
@@ -91,9 +103,10 @@ mod tests {
         let usecase = ValidateUseCase {
             repo: StubRepo {
                 exceptions: vec![exception(id)],
-                audit_ignores: vec![TomlIgnore {
+                audit_ignores: vec![TomlIgnoreRecord {
                     id: id.to_string(),
-                    source: "audit.toml".to_string(),
+                    source_span: span("audit.toml", 4, 4),
+                    section: "advisories.ignore",
                 }],
                 deny_ignores: vec![],
             },
@@ -112,9 +125,10 @@ mod tests {
         let usecase = ValidateUseCase {
             repo: StubRepo {
                 exceptions: vec![],
-                audit_ignores: vec![TomlIgnore {
+                audit_ignores: vec![TomlIgnoreRecord {
                     id: "RUSTSEC-2024-9999".to_string(),
-                    source: "audit.toml".to_string(),
+                    source_span: span("audit.toml", 4, 4),
+                    section: "advisories.ignore",
                 }],
                 deny_ignores: vec![],
             },
@@ -129,7 +143,9 @@ mod tests {
         assert_eq!(violations[0].id, "RUSTSEC-2024-9999");
         assert_eq!(
             violations[0].message,
-            "present in TOML but missing from allowlist"
+            "ignore present in advisories.ignore but missing from allowlist"
         );
+        assert_eq!(violations[0].primary_span.path, "audit.toml");
+        assert_eq!(violations[0].primary_span.line, 4);
     }
 }
