@@ -33,7 +33,7 @@ ignore = [
     fs::write(&deny, "[advisories]\nignore = []\n").unwrap();
     fs::write(
         &exceptions,
-        r#"
+        r"
 exceptions:
   - id: RUSTSEC-2024-0001
     owner: team-security
@@ -43,7 +43,7 @@ exceptions:
     impact: low
     tracking: SEC-123
     resolution: upgrade planned
-"#,
+",
     )
     .unwrap();
 
@@ -82,7 +82,7 @@ ignore = [
     fs::write(&deny, "[advisories]\nignore = []\n").unwrap();
     fs::write(
         &exceptions,
-        r#"
+        r"
 exceptions:
   - id: RUSTSEC-2024-0001
     owner: team-security
@@ -92,7 +92,7 @@ exceptions:
     impact: low
     tracking: SEC-123
     resolution: upgrade planned
-"#,
+",
     )
     .unwrap();
 

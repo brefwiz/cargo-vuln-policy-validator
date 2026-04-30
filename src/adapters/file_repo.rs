@@ -85,8 +85,7 @@ impl ExceptionRepository for FileRepo {
             .unwrap_or_default()
             .into_iter()
             .map(|entry| match entry {
-                IgnoreEntry::Simple(id) => id,
-                IgnoreEntry::Detailed { id, .. } => id,
+                IgnoreEntry::Simple(id) | IgnoreEntry::Detailed { id, .. } => id,
             })
             .collect::<Vec<_>>();
 
@@ -319,7 +318,7 @@ mod tests {
     #[test]
     fn loads_exceptions_from_yaml_with_field_locations() {
         let path = temp_file_path("exceptions.yaml");
-        let contents = r#"
+        let contents = r"
 exceptions:
   - id: RUSTSEC-2024-0001
     owner: team-security
@@ -329,7 +328,7 @@ exceptions:
     impact: low
     tracking: SEC-123
     resolution: upgrade planned
-"#;
+";
         fs::write(&path, contents).unwrap();
 
         let repo = FileRepo;
@@ -347,7 +346,7 @@ exceptions:
     #[test]
     fn keeps_missing_yaml_field_unset_for_validation() {
         let path = temp_file_path("exceptions.yaml");
-        let contents = r#"
+        let contents = r"
 exceptions:
   - id: RUSTSEC-2024-0001
     review_by: 2099-01-01
@@ -356,7 +355,7 @@ exceptions:
     impact: low
     tracking: SEC-123
     resolution: upgrade planned
-"#;
+";
         fs::write(&path, contents).unwrap();
 
         let repo = FileRepo;
