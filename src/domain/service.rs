@@ -8,7 +8,7 @@ pub struct PolicyService;
 impl PolicyService {
     pub fn validate(
         exceptions: Vec<ExceptionRecord>,
-        toml_ignores: Vec<TomlIgnoreRecord>,
+        toml_ignores: &[TomlIgnoreRecord],
     ) -> Vec<Violation> {
         info!("calling into the policy service");
         let mut violations = Vec::new();
@@ -26,7 +26,7 @@ impl PolicyService {
             );
         }
 
-        for ignore in &toml_ignores {
+        for ignore in toml_ignores {
             info!(id = %ignore.id, section = %ignore.section, "checking ignore entry");
             if !exception_map.contains_key(&ignore.id) {
                 violations.push(Violation {
@@ -144,7 +144,7 @@ mod tests {
     fn reports_toml_entries_missing_from_allowlist() {
         let violations = PolicyService::validate(
             vec![exception("RUSTSEC-2024-0001")],
-            vec![TomlIgnoreRecord {
+            &[TomlIgnoreRecord {
                 id: "RUSTSEC-2024-9999".to_string(),
                 source_span: span("audit.toml", 4, 4),
                 section: "advisories.ignore",
@@ -171,7 +171,7 @@ mod tests {
         let mut expired = exception("RUSTSEC-2024-0001");
         expired.review_by = Some(Utc::now().date_naive() - Duration::days(1));
 
-        let violations = PolicyService::validate(vec![expired], vec![]);
+        let violations = PolicyService::validate(vec![expired], &[]);
 
         assert_eq!(violations.len(), 1);
         assert_eq!(violations[0].id, "RUSTSEC-2024-0001");
@@ -185,7 +185,7 @@ mod tests {
         let mut invalid = exception("RUSTSEC-2024-0001");
         invalid.owner = " ".to_string();
 
-        let violations = PolicyService::validate(vec![invalid], vec![]);
+        let violations = PolicyService::validate(vec![invalid], &[]);
 
         assert_eq!(violations.len(), 1);
         assert_eq!(violations[0].message, "required field 'owner' is blank");
@@ -199,7 +199,7 @@ mod tests {
         invalid.owner.clear();
         invalid.owner_span = None;
 
-        let violations = PolicyService::validate(vec![invalid], vec![]);
+        let violations = PolicyService::validate(vec![invalid], &[]);
 
         assert_eq!(violations.len(), 1);
         assert_eq!(violations[0].message, "required field 'owner' is missing");
@@ -211,7 +211,7 @@ mod tests {
         let id = "RUSTSEC-2024-0001";
         let violations = PolicyService::validate(
             vec![exception(id)],
-            vec![TomlIgnoreRecord {
+            &[TomlIgnoreRecord {
                 id: id.to_string(),
                 source_span: span("deny.toml", 4, 4),
                 section: "advisories.ignore",

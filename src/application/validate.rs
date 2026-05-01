@@ -16,7 +16,7 @@ impl<R: ExceptionRepository, P: Reporter> ValidateUseCase<R, P> {
         let mut all = audit_ignores;
         all.extend(deny_ignores);
 
-        let violations = PolicyService::validate(exceptions, all);
+        let violations = PolicyService::validate(exceptions, &all);
 
         if violations.is_empty() {
             println!("✅ Policy validation OK");
