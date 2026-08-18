@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- Scratch OCI image (`Dockerfile`) that ships only the validator binary for
+  ci-internal to COPY, instead of compiling from git on every rebake.
+
 ## [0.1.0] - 2026-04-22
 
 ### Added

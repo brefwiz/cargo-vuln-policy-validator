@@ -4,7 +4,7 @@
 
 .PHONY: help fmt fmt-check clippy test build clean \
         ci ci-format ci-lint ci-test ci-audit ci-coverage ci-deny ci-package \
-        spec-check lockfile ci-lockfile-diff
+        spec-check lockfile ci-lockfile-diff ci-changelog pre-commit
 
 help:
 	@echo "Usage: make <target>"
@@ -77,6 +77,11 @@ ci-lockfile-diff: ## Assert committed Cargo.lock matches resolved lock
 	  echo 'ERROR: Cargo.lock is out of date. Run: make lockfile && git add Cargo.lock'; \
 	  git diff Cargo.lock; exit 1; \
 	fi
+
+ci-changelog: ## CI: verify CHANGELOG.md has entry for current package version
+	@curl -fsSL https://raw.githubusercontent.com/brefwiz/shared-ci-workflows/main/scripts/check-release-changelog.sh | bash
+
+pre-commit: ci-format ci-lint ci-test ci-changelog ## Run all pre-commit checks
 
 spec-check: ## ADR-0086 L1: validate SPEC.md wire_surface field
 	@VALID="proto-source utoipa-legacy mixed-transition"; \
