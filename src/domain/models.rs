@@ -102,7 +102,20 @@ pub enum IgnoreEntry {
 pub enum ViolationKind {
     TomlIgnoreMissingException,
     ExceptionReviewExpired,
+    ExceptionReviewExpiredNotice,
     ExceptionFieldMissing,
+}
+
+impl ViolationKind {
+    /// Whether this kind should fail validation. Only
+    /// `ExceptionReviewExpiredNotice` is informational: it fires when an
+    /// exception's review date has passed but the advisory it covers isn't
+    /// present in this consumer's Cargo.lock (no matching `advisories.ignore`
+    /// entry in its audit.toml/deny.toml), so the expiry doesn't carry risk
+    /// for this consumer.
+    pub fn is_blocking(&self) -> bool {
+        !matches!(self, ViolationKind::ExceptionReviewExpiredNotice)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -123,6 +136,9 @@ impl Violation {
             }
             ViolationKind::ExceptionReviewExpired => {
                 "Update the review_by date in this exception record.".to_string()
+            }
+            ViolationKind::ExceptionReviewExpiredNotice => {
+                "review_by has passed, but this advisory isn't present in this consumer's Cargo.lock (no matching advisories.ignore entry); update the date when convenient, no action required now.".to_string()
             }
             ViolationKind::ExceptionFieldMissing => format!(
                 "Update the '{}' field in this exception record.",

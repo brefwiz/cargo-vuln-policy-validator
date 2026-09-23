@@ -23,4 +23,17 @@ impl Reporter for StdoutReporter {
             }
         }
     }
+
+    fn report_notices(&self, notices: &[Violation]) {
+        println!("\nℹ️  Policy notices (non-blocking):\n");
+
+        for v in notices {
+            println!(" - {}: {}", v.id, v.message);
+            println!(
+                "   ↳ {}:{}:{}",
+                v.primary_span.path, v.primary_span.line, v.primary_span.column
+            );
+            println!("   ↳ {}", v.edit_hint());
+        }
+    }
 }

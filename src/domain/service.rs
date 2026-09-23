@@ -1,14 +1,20 @@
 use crate::domain::models::{ExceptionRecord, TomlIgnoreRecord, Violation, ViolationKind};
 use chrono::Utc;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use tracing::info;
 
 pub struct PolicyService;
 
 impl PolicyService {
+    /// `affected_ids` is the set of RUSTSEC ids that actually affect this
+    /// consumer's own Cargo.lock (a crate covered by the advisory is present
+    /// at an affected version) — distinct from `toml_ignores`, which mirrors
+    /// whatever the shared/central audit.toml and deny.toml ignore lists say
+    /// and is identical for every consumer.
     pub fn validate(
         exceptions: Vec<ExceptionRecord>,
         toml_ignores: Vec<TomlIgnoreRecord>,
+        affected_ids: &HashSet<String>,
     ) -> Vec<Violation> {
         info!("calling into the policy service");
         let mut violations = Vec::new();
@@ -52,14 +58,25 @@ impl PolicyService {
                 .review_by
                 .is_some_and(|review_by| review_by < today)
             {
-                violations.push(Violation {
-                    id: exception.id.clone(),
-                    message: "review expired".into(),
-                    kind: ViolationKind::ExceptionReviewExpired,
-                    field: Some("review_by".to_string()),
-                    primary_span: exception.missing_field_anchor("review_by"),
-                    related_spans: Vec::new(),
-                });
+                if affected_ids.contains(exception.id.as_str()) {
+                    violations.push(Violation {
+                        id: exception.id.clone(),
+                        message: "review expired".into(),
+                        kind: ViolationKind::ExceptionReviewExpired,
+                        field: Some("review_by".to_string()),
+                        primary_span: exception.missing_field_anchor("review_by"),
+                        related_spans: Vec::new(),
+                    });
+                } else {
+                    violations.push(Violation {
+                        id: exception.id.clone(),
+                        message: "review expired, but advisory not present in this consumer's Cargo.lock at an affected version".into(),
+                        kind: ViolationKind::ExceptionReviewExpiredNotice,
+                        field: Some("review_by".to_string()),
+                        primary_span: exception.missing_field_anchor("review_by"),
+                        related_spans: Vec::new(),
+                    });
+                }
             }
 
             for field in [
@@ -114,6 +131,7 @@ mod tests {
     use super::PolicyService;
     use crate::domain::models::{ExceptionRecord, SourceSpan, TomlIgnoreRecord, ViolationKind};
     use chrono::{Duration, Utc};
+    use std::collections::HashSet;
 
     fn span(path: &str, line: usize, column: usize) -> SourceSpan {
         SourceSpan::new(path, line, column)
@@ -140,6 +158,10 @@ mod tests {
         }
     }
 
+    fn ids(values: &[&str]) -> HashSet<String> {
+        values.iter().map(|v| v.to_string()).collect()
+    }
+
     #[test]
     fn reports_toml_entries_missing_from_allowlist() {
         let violations = PolicyService::validate(
@@ -149,6 +171,7 @@ mod tests {
                 source_span: span("audit.toml", 4, 4),
                 section: "advisories.ignore",
             }],
+            &HashSet::new(),
         );
 
         assert_eq!(violations.len(), 1);
@@ -167,17 +190,54 @@ mod tests {
     }
 
     #[test]
-    fn reports_expired_allowlist_entries_at_review_date() {
+    fn reports_expired_allowlist_entries_present_in_the_lock_at_review_date() {
         let mut expired = exception("RUSTSEC-2024-0001");
         expired.review_by = Some(Utc::now().date_naive() - Duration::days(1));
 
-        let violations = PolicyService::validate(vec![expired], vec![]);
+        let violations =
+            PolicyService::validate(vec![expired], vec![], &ids(&["RUSTSEC-2024-0001"]));
 
         assert_eq!(violations.len(), 1);
         assert_eq!(violations[0].id, "RUSTSEC-2024-0001");
         assert_eq!(violations[0].message, "review expired");
         assert_eq!(violations[0].kind, ViolationKind::ExceptionReviewExpired);
+        assert!(violations[0].kind.is_blocking());
         assert_eq!(violations[0].primary_span.line, 5);
+    }
+
+    #[test]
+    fn notices_expired_allowlist_entries_absent_from_the_lock_at_review_date() {
+        let mut expired = exception("RUSTSEC-2024-0001");
+        expired.review_by = Some(Utc::now().date_naive() - Duration::days(1));
+
+        let violations = PolicyService::validate(
+            vec![expired],
+            vec![TomlIgnoreRecord {
+                id: "RUSTSEC-2024-0001".to_string(),
+                source_span: span("deny.toml", 4, 4),
+                section: "advisories.ignore",
+            }],
+            &HashSet::new(),
+        );
+
+        assert_eq!(violations.len(), 1);
+        assert_eq!(violations[0].id, "RUSTSEC-2024-0001");
+        assert_eq!(
+            violations[0].kind,
+            ViolationKind::ExceptionReviewExpiredNotice
+        );
+        assert!(!violations[0].kind.is_blocking());
+    }
+
+    #[test]
+    fn does_not_notice_or_block_when_review_date_is_unexpired_and_absent_from_the_lock() {
+        let violations = PolicyService::validate(
+            vec![exception("RUSTSEC-2024-0001")],
+            vec![],
+            &HashSet::new(),
+        );
+
+        assert!(violations.is_empty());
     }
 
     #[test]
@@ -185,7 +245,7 @@ mod tests {
         let mut invalid = exception("RUSTSEC-2024-0001");
         invalid.owner = " ".to_string();
 
-        let violations = PolicyService::validate(vec![invalid], vec![]);
+        let violations = PolicyService::validate(vec![invalid], vec![], &HashSet::new());
 
         assert_eq!(violations.len(), 1);
         assert_eq!(violations[0].message, "required field 'owner' is blank");
@@ -199,7 +259,7 @@ mod tests {
         invalid.owner.clear();
         invalid.owner_span = None;
 
-        let violations = PolicyService::validate(vec![invalid], vec![]);
+        let violations = PolicyService::validate(vec![invalid], vec![], &HashSet::new());
 
         assert_eq!(violations.len(), 1);
         assert_eq!(violations[0].message, "required field 'owner' is missing");
@@ -216,6 +276,7 @@ mod tests {
                 source_span: span("deny.toml", 4, 4),
                 section: "advisories.ignore",
             }],
+            &HashSet::new(),
         );
 
         assert!(violations.is_empty());
