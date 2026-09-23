@@ -1,6 +1,6 @@
 [package]
 name = "cargo-vuln-policy-validator"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 authors = ["Gregoire Salingue"]
 description = "Validate cargo audit and cargo deny ignore lists against a reviewed exception policy"
