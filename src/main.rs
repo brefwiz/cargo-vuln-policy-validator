@@ -3,6 +3,7 @@ mod application;
 mod domain;
 mod ports;
 use adapters::file_repo::FileRepo;
+use adapters::rustsec_advisories::RustsecAdvisories;
 use adapters::stdout_reporter::StdoutReporter;
 use application::validate::ValidateUseCase;
 use tracing::info;
@@ -21,8 +22,13 @@ fn main() -> anyhow::Result<()> {
     init_tracing();
     let repo = FileRepo;
     let reporter = StdoutReporter;
+    let advisories = RustsecAdvisories;
 
-    let usecase = ValidateUseCase { repo, reporter };
+    let usecase = ValidateUseCase {
+        repo,
+        reporter,
+        advisories,
+    };
 
     let args: Vec<String> = std::env::args().collect();
 

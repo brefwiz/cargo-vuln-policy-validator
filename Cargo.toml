@@ -9,7 +9,7 @@ repository = "https://github.com/brefwiz/cargo-vuln-policy-validator"
 readme = "README.md"
 keywords = ["cargo", "security", "audit", "policy", "rustsec"]
 categories = ["command-line-utilities", "development-tools::cargo-plugins"]
-rust-version = "1.85"
+rust-version = "1.88"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
@@ -21,3 +21,4 @@ env_logger = "0.11"
 chrono = { version = "0.4", features = ["serde"] }
 thiserror = "2"
 anyhow = "1"
+rustsec = "0.33"

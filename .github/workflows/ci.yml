@@ -13,6 +13,47 @@ jobs:
     uses: brefwiz/shared-ci-workflows/.github/workflows/rust.yml@main
     with:
       run-coverage: true
+      # This repo IS cargo-vuln-policy-validator: the shared security job
+      # would validate central policy mapping with the binary baked into
+      # ghcr.io/brefwiz/ci:latest at image-build time (main HEAD as of the
+      # last image rebuild), not this PR's own source. Run our own security
+      # job below instead, built from source, so a fix here is actually
+      # exercised by its own PR.
+      run-security: false
+
+  security:
+    name: Security (audit + deny, from source)
+    runs-on: ubuntu-latest
+    container: ghcr.io/brefwiz/ci:latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch central policies
+        uses: actions/checkout@v4
+        with:
+          repository: brefwiz/shared-ci-workflows
+          path: .shared-ci-workflows
+          sparse-checkout: |
+            policies
+            scripts
+
+      - name: Build cargo-vuln-policy-validator from source
+        run: cargo build --release --locked
+
+      - name: Validate central policy mapping (this PR's build)
+        run: >
+          ./target/release/cargo-vuln-policy-validator
+          .shared-ci-workflows/policies/audit.toml
+          .shared-ci-workflows/policies/deny.toml
+          .shared-ci-workflows/policies/exceptions.yaml
+
+      - name: cargo audit (central)
+        run: cargo audit --file .shared-ci-workflows/policies/audit.toml
+
+      - name: cargo deny (central)
+        run: cargo deny check --config .shared-ci-workflows/policies/deny.toml
 
   docs:
     runs-on: ubuntu-latest
