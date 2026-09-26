@@ -72,10 +72,17 @@ lockfile: ## Regenerate Cargo.lock
 	cargo generate-lockfile
 
 ci-lockfile-diff: ## Assert committed Cargo.lock matches resolved lock
-	@cargo generate-lockfile
-	@if ! git diff --quiet Cargo.lock; then \
-	  echo 'ERROR: Cargo.lock is out of date. Run: make lockfile && git add Cargo.lock'; \
-	  git diff Cargo.lock; exit 1; \
+	# `--locked` fails only when Cargo.lock no longer satisfies Cargo.toml.
+	# Re-resolving with `cargo generate-lockfile` and diffing turns red
+	# whenever any transitive dependency publishes, with nothing wrong in the
+	# tree, and rewrites the lock as a side effect.
+	@if cargo metadata --locked --format-version 1 >/dev/null; then \
+		echo "Cargo.lock is consistent with Cargo.toml (--locked)."; \
+	else \
+		echo ""; \
+		echo "ERROR: Cargo.lock is out of date / inconsistent with Cargo.toml."; \
+		echo "Run: ~/.claude/helpers/cargo-lock-sync origin/main && git add Cargo.lock"; \
+		exit 1; \
 	fi
 
 ci-changelog: ## CI: verify CHANGELOG.md has entry for current package version
